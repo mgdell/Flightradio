@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SignalScout | Scanner Frequencies Near You</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-glow page-glow-left"></div>
+    <div class="page-glow page-glow-right"></div>
+
+    <div class="shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Location-Based Scanner Programming</p>
+          <h1>Find scanner frequencies for the area around you.</h1>
+          <p class="hero-text">
+            SignalScout builds a starter scan list from your location or a
+            selected metro area. Browse police, fire, EMS, aviation, rail,
+            marine, and public works channels, then copy a clean programming
+            bank into your scanner workflow.
+          </p>
+          <div class="hero-pills">
+            <span>Use my location</span>
+            <span>Service filters</span>
+            <span>Copy-ready programming list</span>
+          </div>
+        </div>
+
+        <aside class="hero-panel">
+          <p class="hero-panel-label">Before you program</p>
+          <ul class="tips-list">
+            <li>Confirm local legality and agency encryption in your area.</li>
+            <li>These are curated starter channels, not a full frequency database.</li>
+            <li>Check mode and tone details before saving permanent banks.</li>
+          </ul>
+        </aside>
+      </header>
+
+      <main class="layout">
+        <section class="control-panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Frequency Finder</p>
+            <h2>Build a local scanner bank</h2>
+          </div>
+
+          <form id="filter-form" class="filter-form">
+            <label>
+              Search by city, county, service, or agency
+              <input
+                id="location-query"
+                name="locationQuery"
+                type="text"
+                placeholder="Detroit, Wayne County, fire dispatch, rail..."
+              />
+            </label>
+
+            <div class="form-grid">
+              <label>
+                Region
+                <select id="region-select" name="region"></select>
+              </label>
+
+              <label>
+                Service
+                <select id="category-select" name="category">
+                  <option value="all">All services</option>
+                  <option value="police">Police</option>
+                  <option value="fire">Fire</option>
+                  <option value="ems">EMS</option>
+                  <option value="aviation">Aviation</option>
+                  <option value="rail">Rail</option>
+                  <option value="marine">Marine</option>
+                  <option value="public-works">Public Works</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button type="submit" id="apply-button">Show frequencies</button>
+              <button type="button" id="geo-button" class="button-secondary">
+                Use my location
+              </button>
+              <button type="button" id="demo-button" class="button-secondary">
+                Load Detroit set
+              </button>
+            </div>
+          </form>
+
+          <div class="reference-card">
+            <p class="reference-title">Service Notes</p>
+            <div class="reference-grid">
+              <div>
+                <span class="reference-label">Police</span>
+                <p>Dispatch, citywide events, tactical traffic when not encrypted.</p>
+              </div>
+              <div>
+                <span class="reference-label">Fire / EMS</span>
+                <p>Dispatch, fireground, medical coordination, county paging.</p>
+              </div>
+              <div>
+                <span class="reference-label">Aviation / Rail</span>
+                <p>Usually strong listening targets with wide regional coverage.</p>
+              </div>
+              <div>
+                <span class="reference-label">Marine / Public Works</span>
+                <p>Useful during storms, events, snow operations, and summer boating.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="results-panel">
+          <div class="summary-bar">
+            <div>
+              <p class="eyebrow">Programming Summary</p>
+              <h2 id="summary-title">Ready to build a scan list</h2>
+            </div>
+            <span id="status-pill" class="status-pill" data-state="idle">Idle</span>
+          </div>
+
+          <p id="status-message" class="status-message">
+            Choose a region, search by service, or let the browser select the
+            nearest featured metro area.
+          </p>
+
+          <dl id="region-meta" class="region-meta">
+            <div>
+              <dt>Region</dt>
+              <dd id="meta-region">-</dd>
+            </div>
+            <div>
+              <dt>Coverage</dt>
+              <dd id="meta-coverage">-</dd>
+            </div>
+            <div>
+              <dt>Closest hubs</dt>
+              <dd id="meta-areas">-</dd>
+            </div>
+            <div>
+              <dt>Matches</dt>
+              <dd id="meta-count">-</dd>
+            </div>
+          </dl>
+
+          <section class="program-panel">
+            <div class="program-header">
+              <div>
+                <p class="reference-title">Programming Bank</p>
+                <p class="program-copy">
+                  Copy this list into your notes or scanner software as a
+                  starter bank.
+                </p>
+              </div>
+              <button type="button" id="copy-button" class="button-secondary">
+                Copy list
+              </button>
+            </div>
+            <textarea
+              id="program-output"
+              class="program-output"
+              readonly
+              aria-label="Programming bank output"
+            ></textarea>
+          </section>
+
+          <div id="results" class="results" aria-live="polite"></div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
