@@ -16,40 +16,8 @@ typed location.
 - `index.html`: aviation-focused app shell and layout
 - `styles.css`: responsive visual design
 - `app.js`: frontend search flow, rendering, and copy behavior
-- `server.py`: local API for geocoding, airport lookup, and frequency loading
-
-## Local use
-
-Run the bundled local server:
-
-<small><code>python3 server.py</code></small>
-
-Then open `http://127.0.0.1:8000`.
-
-## A2 Hosting
-
-This project is now compatible with cPanel `Setup Python App`.
-
-Upload these files to your app directory:
-
-- `index.html`
-- `styles.css`
-- `app.js`
-- `server.py`
-- `passenger_wsgi.py`
-- `flight-radio-logo.png`
-
-In A2 cPanel:
-
-1. Open `Setup Python App`.
-2. Create an app using Python 3.
-3. Set the application root to this project folder.
-4. Set the application startup file to `passenger_wsgi.py`.
-5. Set the application entry point to `application`.
-6. Restart the app from cPanel after uploading or changing files.
-
-This app now uses relative asset and API paths, so it is safe to mount under a
-subpath such as `https://mikedell.org/flightradio/`.
+- `server.py`: backend API for geocoding, airport lookup, and frequency loading
+- `passenger_wsgi.py`: WSGI entry point for Python hosting environments
 
 ## Data notes
 
