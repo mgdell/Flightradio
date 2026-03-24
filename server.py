@@ -20,12 +20,17 @@ HOST = "127.0.0.1"
 PORT = 8000
 APP_DIR = Path(__file__).resolve().parent
 USER_AGENT = "Flight-Radio/1.0 (python app)"
+AIRNAV_USER_AGENT = (
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+  "AppleWebKit/537.36 (KHTML, like Gecko) "
+  "Chrome/123.0.0.0 Safari/537.36"
+)
 AIRPORTS_CSV_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
 FREQUENCIES_CSV_URL = "https://davidmegginson.github.io/ourairports-data/airport-frequencies.csv"
 GEOCODE_URL = "https://nominatim.openstreetmap.org/search"
 AIRNAV_URL_TEMPLATE = "https://www.airnav.com/airport/{ident}"
 CACHE_TTL_SECONDS = 60 * 60 * 6
-MAX_AIRPORTS = 6
+MAX_AIRPORTS = 8
 MAX_FREQUENCIES_PER_AIRPORT = 12
 
 TYPE_LABELS = {
@@ -33,6 +38,7 @@ TYPE_LABELS = {
   "GND": "Ground",
   "APP": "Approach",
   "DEP": "Departure",
+  "CENTER": "Center",
   "ATIS": "ATIS",
   "CTAF": "CTAF",
   "UNIC": "UNICOM",
@@ -330,11 +336,12 @@ def resolve_airport_frequencies(
   airport: dict[str, Any],
   frequencies_by_airport: dict[str, list[dict[str, str]]],
 ) -> list[dict[str, str]]:
+  base_rows = frequencies_by_airport.get(airport["ident"], [])
   if airport["ident"].startswith("K"):
     airnav_rows = fetch_airnav_frequencies(airport["ident"])
     if airnav_rows:
-      return airnav_rows
-  return frequencies_by_airport.get(airport["ident"], [])
+      return dedupe_frequency_rows(airnav_rows + base_rows)
+  return base_rows
 
 
 def fetch_airnav_frequencies(ident: str) -> list[dict[str, str]]:
@@ -343,7 +350,13 @@ def fetch_airnav_frequencies(ident: str) -> list[dict[str, str]]:
     return cached[1]
 
   try:
-    html = fetch_text(AIRNAV_URL_TEMPLATE.format(ident=ident.lower()))
+    html = fetch_text(
+      AIRNAV_URL_TEMPLATE.format(ident=ident.lower()),
+      extra_headers={
+        "User-Agent": AIRNAV_USER_AGENT,
+        "Accept-Language": "en-US,en;q=0.8",
+      },
+    )
     rows = parse_airnav_frequencies(html)
   except Exception:
     rows = []
@@ -363,30 +376,88 @@ def parse_airnav_frequencies(html: str) -> list[dict[str, str]]:
 
   section = match.group(1)
   section = re.sub(r"<br\s*/?>", "\n", section, flags=re.IGNORECASE)
-  section = re.sub(r"</p>|</tr>|</td>|</div>", "\n", section, flags=re.IGNORECASE)
+  section = re.sub(r"<li[^>]*>", "\n", section, flags=re.IGNORECASE)
+  section = re.sub(r"</p>|</tr>|</td>|</div>|</li>", "\n", section, flags=re.IGNORECASE)
   section = re.sub(r"<[^>]+>", " ", section)
   section = html_unescape(section)
   lines = [re.sub(r"\s+", " ", line).strip() for line in section.splitlines()]
-  lines = [line for line in lines if ":" in line]
+  lines = [line.lstrip("*- ").strip() for line in lines if line.strip()]
 
   parsed_rows: list[dict[str, str]] = []
   for line in lines:
-    label, values = line.split(":", 1)
-    freq_type = classify_airnav_type(label)
-    if not freq_type:
+    if ":" in line:
+      label, values = line.split(":", 1)
+      freq_type = classify_airnav_type(label)
+      if not freq_type:
+        continue
+
+      frequencies = re.findall(r"\b\d{2,3}\.\d{1,3}\b", values)
+      for frequency in frequencies:
+        parsed_rows.append(
+          {
+            "type": freq_type,
+            "description": normalize_airnav_description(label),
+            "frequency_mhz": normalize_frequency_string(frequency),
+          }
+        )
       continue
 
-    frequencies = re.findall(r"\b\d{2,3}\.\d{1,3}\b", values)
-    for frequency in frequencies:
-      parsed_rows.append(
-        {
-          "type": freq_type,
-          "description": normalize_airnav_description(label),
-          "frequency_mhz": normalize_frequency_string(frequency),
-        }
-      )
+    parsed_rows.extend(parse_airnav_service_line(line))
 
-  return parsed_rows
+  return dedupe_frequency_rows(parsed_rows)
+
+
+def parse_airnav_service_line(line: str) -> list[dict[str, str]]:
+  normalized = re.sub(r"\s+", " ", line).strip()
+  if not normalized:
+    return []
+
+  upper = normalized.upper()
+  if "ARTCC" not in upper and "CENTER" not in upper and "CENTRE" not in upper:
+    return []
+  if "APCH/DEP" not in upper and "APP/DEP" not in upper and "APPROACH" not in upper and "DEPARTURE" not in upper:
+    return []
+  frequencies = re.findall(r"\b\d{2,3}\.\d{1,3}\b", normalized)
+  if not frequencies:
+    return []
+
+  center_name_match = re.search(
+    r"BY\s+(.+?)\s+(?:ARTCC|CENTER|CENTRE)\b",
+    normalized,
+    flags=re.IGNORECASE,
+  )
+  center_name = center_name_match.group(1).strip() if center_name_match else "Center"
+  return build_center_service_rows(center_name, normalized)
+
+
+def build_center_service_rows(center_name: str, freq_blob: str) -> list[dict[str, str]]:
+  frequencies = re.findall(r"\b\d{2,3}\.\d{1,3}\b", freq_blob)
+  center_description = f"{center_name.title()} Center"
+  rows: list[dict[str, str]] = []
+  for frequency in frequencies:
+    numeric = safe_float(frequency)
+    if numeric is None or not (108 <= numeric < 137):
+      continue
+    rows.append(
+      {
+        "type": "APP",
+        "label": "App/Dep",
+        "description": center_description,
+        "frequency_mhz": normalize_frequency_string(frequency),
+      }
+    )
+  return rows
+
+def dedupe_frequency_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+  seen: set[tuple[str, str, str]] = set()
+  deduped: list[dict[str, str]] = []
+  for row in rows:
+    key = (row.get("type", ""), row.get("description", ""), row.get("frequency_mhz", ""))
+    if key in seen:
+      continue
+    seen.add(key)
+    deduped.append(row)
+  return deduped
 
 
 def html_unescape(value: str) -> str:
@@ -402,6 +473,8 @@ def classify_airnav_type(label: str) -> str | None:
   normalized = label.upper()
   if "ATIS" in normalized:
     return "ATIS"
+  if "CENTER" in normalized or "CENTRE" in normalized or "ARTCC" in normalized:
+    return "CENTER"
   if "GROUND" in normalized:
     return "GND"
   if "TOWER" in normalized:
@@ -443,7 +516,7 @@ def normalize_frequency(row: dict[str, str], airport: dict[str, Any]) -> dict[st
   display_frequency, band = normalize_display_frequency(raw_frequency, airport, freq_type)
   return {
     "type": freq_type,
-    "label": TYPE_LABELS.get(freq_type, freq_type),
+    "label": row.get("label", "").strip() or TYPE_LABELS.get(freq_type, freq_type),
     "description": row.get("description", "").strip() or TYPE_LABELS.get(freq_type, freq_type),
     "frequencyMHz": display_frequency,
     "band": band,
